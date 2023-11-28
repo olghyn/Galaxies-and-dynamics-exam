@@ -18,6 +18,7 @@ local void walksub(nodeptr *, nodeptr *, cellptr, cellptr,
 local void gravsum(bodyptr, cellptr, cellptr);
 local void sumnode(cellptr, cellptr, vector, real *, vector);
 local void sumcell(cellptr, cellptr, vector, real *, vector);
+local void sumhernquist(vector, vector);
 
 /* Lists of active nodes and interactions. */
 
@@ -205,10 +206,34 @@ local void gravsum(bodyptr p0, cellptr cptr, cellptr bptr)
                                                 /* sum cell forces wo quads */
     sumnode(bptr, interact + actlen, pos0, &phi0, acc0);
                                                 /* sum forces from bodies   */
+    
+    sumhernquist(pos0, acc0);
+                                                
     Phi(p0) = phi0;                             /* store total potential    */
     SETV(Acc(p0), acc0);                        /* and total acceleration   */
     nbbcalc += interact + actlen - bptr;        /* count body-body forces   */
     nbccalc += cptr - interact;                 /* count body-cell forces   */
+}
+
+
+local void sumhernquist(vector pos0, vector acc0)
+{
+    real dr_h2, norm_dr_h, dr_origin, a, M_tot, acc_h;
+    vector dr_h, origin, versor_r;
+    
+    a = 2.0;                                   /* parameter of Hernquist   */
+    M_tot = 5.0;                                /* parameter of Hernquist   */
+    
+    CLRV(origin);                               /* set origin=(0,0,0)       */
+    DOTPSUBV(dr_h2, dr_h, origin, pos0);        /* distance particle-origin */
+    
+    norm_dr_h = 1 / rsqrt(dr_h2);               /* compute 1/norm(r)        */
+    MULVS(versor_r, pos0, norm_dr_h);           /* define the radial versor */
+    
+    dr_origin = rsqrt(dr_h2);
+    acc_h = -(M_tot * 2 * (dr_origin + a) - (3 * dr_origin)) / (rsqr(dr_origin + a) * rsqr(dr_origin + a)); /* Hernquist acc. */
+    
+    ADDMULVS(acc0, versor_r, acc_h);
 }
 
 /*
@@ -226,21 +251,9 @@ local void sumnode(cellptr start, cellptr finish,
                    vector pos0, real *phi0, vector acc0)
 {
     cellptr p;
-    real eps2, dr2, dr_h2, drab, phi_p, mr3i, norm_dr_h, dr_origin, a, M_tot, acc_h;
-    vector dr, dr_h, origin, versor_r;
-    
-    a = 10.0;                                   /* parameter of Hernquist   */
-    M_tot = 10.0;                               /* parameter of Hernquist   */
-    
-    CLRV(origin);                               /* set origin=(0,0,0)       */
-    DOTPSUBV(dr_h2, dr_h, origin, pos0);        /* distance particle-origin */
-    
-    norm_dr_h = 1 / rsqrt(dr_h2);               /* compute 1/norm(r)        */
-    MULVS(versor_r, pos0, norm_dr_h);           /* define the radial versor */
-    
-    dr_origin = rsqrt(dr_h2);
-    acc_h = (M_tot * 2 * (dr_origin + a) - (3 * dr_origin)) / (rsqr(dr_origin + a) * rsqr(dr_origin + a)); /* Hernquist acc. */
-    
+    real eps2, dr2, drab, phi_p, mr3i;
+    vector dr;
+
     eps2 = eps * eps;                           /* avoid extra multiplys    */
     for (p = start; p < finish; p++) {          /* loop over node list      */
         DOTPSUBV(dr2, dr, Pos(p), pos0);        /* compute separation       */
@@ -250,7 +263,7 @@ local void sumnode(cellptr start, cellptr finish,
         phi_p = Mass(p) / drab;                 /* get partial potential    */
         *phi0 -= phi_p;                         /* decrement tot potential  */
         mr3i = phi_p / dr2;                     /* form scale factor for dr */
-        ADDMULVS2(acc0, dr, mr3i, versor_r, acc_h);               /* sum partial acceleration */
+        ADDMULVS(acc0, dr, mr3i);               /* sum partial acceleration */
     }
 }
 
