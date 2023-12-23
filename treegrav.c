@@ -218,11 +218,14 @@ local void gravsum(bodyptr p0, cellptr cptr, cellptr bptr)
 
 local void sumhernquist(vector pos0, vector acc0)
 {
-    real dr_h2, norm_dr_h, dr_origin, a, M_tot, acc_h;
+    real dr_h2, norm_dr_h, dr_origin, a_halo, M_halo, a_bulge, M_bulge, acc_halo, acc_bulge, acc_h;
     vector dr_h, origin, versor_r;
     
-    a = 2.0;                                   /* parameter of Hernquist   */
-    M_tot = 5.0;                                /* parameter of Hernquist   */
+    a_halo = 10.0;                                /* parameter of Hernquist halo */
+    M_halo = 6.0;                                /* parameter of Hernquist halo */
+    
+    a_bulge = 0.5;                                 /* parameter of Hernquist bulge */
+    M_bulge = 0.02 ;                                 /* parameter of Hernquist bulge */ 
     
     CLRV(origin);                               /* set origin=(0,0,0)       */
     DOTPSUBV(dr_h2, dr_h, origin, pos0);        /* distance particle-origin */
@@ -231,7 +234,11 @@ local void sumhernquist(vector pos0, vector acc0)
     MULVS(versor_r, pos0, norm_dr_h);           /* define the radial versor */
     
     dr_origin = rsqrt(dr_h2);
-    acc_h = -(M_tot * 2 * (dr_origin + a) - (3 * dr_origin)) / (rsqr(dr_origin + a) * rsqr(dr_origin + a)); /* Hernquist acc. */
+    acc_halo = - M_halo / rsqr(dr_origin + a_halo); /* Hernquist acc. for halo*/
+    
+    acc_bulge = - M_bulge / rsqr(dr_origin + a_bulge); /* Hernquist acc. for bulge*/
+    
+    acc_h = acc_halo;                         /* Hernquist tot halo + bulge */
     
     ADDMULVS(acc0, versor_r, acc_h);
 }
